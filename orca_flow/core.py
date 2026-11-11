@@ -196,7 +196,7 @@ class Store:
         return {"added": added, "skipped": skipped}
 
     def save_quote(self, customer_id: int, title: str, expires: str, items: list[dict],
-                   discount="0", notes="", quote_id: int | None = None) -> int:
+                   discount="0", notes="", quote_id: int | None = None, expected_updated: str | None = None) -> int:
         title, notes = text(title, "título", True, 200), text(notes, "condições", limit=6000)
         expires = valid_date(expires)
         discount_cents = cents(discount)
@@ -209,12 +209,15 @@ class Store:
         customer = self.customer(customer_id)
         snapshot = json.dumps({key: customer[key] for key in ("name", "company", "email", "phone")}, ensure_ascii=False)
         with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
             if quote_id:
-                old = db.execute("SELECT stage FROM quotes WHERE id=?", (quote_id,)).fetchone()
+                old = db.execute("SELECT stage,updated FROM quotes WHERE id=?", (quote_id,)).fetchone()
                 if not old:
                     raise ValueError("Orçamento não encontrado.")
                 if old["stage"] != "Rascunho":
                     raise ValueError("Edite somente rascunhos. Duplique para criar uma nova proposta.")
+                if expected_updated and old["updated"] != expected_updated:
+                    raise ValueError("Este rascunho foi atualizado em outro acesso. Reabra a proposta para conferir a versão mais recente.")
                 db.execute("UPDATE quotes SET customer_id=?,customer_snapshot=?,title=?,expires=?,discount_cents=?,notes=?,updated=? WHERE id=?",
                            (customer_id, snapshot, title, expires, discount_cents, notes, now(), quote_id))
                 db.execute("DELETE FROM lines WHERE quote_id=?", (quote_id,))

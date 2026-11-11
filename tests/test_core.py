@@ -122,6 +122,14 @@ class StoreTests(unittest.TestCase):
             self.store.import_customers(source)
         self.assertEqual(len(self.store.customers()), 2)
 
+    def test_web_draft_rejects_overwriting_a_newer_version(self):
+        quote_id = self.quote()
+        original = self.store.quote(quote_id)
+        self.quote(quote_id=quote_id, title="Atualizado em outro navegador")
+        with self.assertRaisesRegex(ValueError, "outro acesso"):
+            self.quote(quote_id=quote_id, expected_updated=original["updated"])
+        self.assertEqual(self.store.quote(quote_id)["title"], "Atualizado em outro navegador")
+
     def test_backup_restore_roundtrip_preserves_previous_database(self):
         self.quote()
         backup = self.root / "backup.sqlite3"

@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile",
-                    "--windowed", "--noupx", "--name", "OrcaFlow", "--distpath", str(ROOT / "dist"),
+                    "--windowed", "--noupx", "--name", "OrcaFlow", "--add-data", str(ROOT / "orca_flow" / "frontend") + ";orca_flow/frontend", "--distpath", str(ROOT / "dist"),
                     "--workpath", str(ROOT / "build"), "--specpath", str(ROOT / "build"), str(ROOT / "iniciar.pyw")], cwd=ROOT, check=True)
     target = ROOT / "dist" / "OrcaFlow.exe"
     with target.open("rb") as stream:

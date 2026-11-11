@@ -8,3 +8,9 @@ dist/
 .test-artifacts/
 *.sqlite3*
 .env*
+*.log
+.server-key
+.impeccable/
+.agents/
+node_modules/
+coverage/

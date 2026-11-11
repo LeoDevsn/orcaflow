@@ -15,4 +15,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '${{ matrix.python }}'
+      - run: python -m pip install .
       - run: python -X utf8 -m unittest discover -s tests -v
+      - run: node --check orca_flow/frontend/app.js
+      - run: npm ci
+      - run: npm test

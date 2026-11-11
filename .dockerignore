@@ -1,0 +1,13 @@
+.git
+.test-artifacts
+dist
+build
+node_modules
+__pycache__
+**/__pycache__
+*.sqlite3*
+.server-key
+*.log
+.impeccable
+.agents
+.env*
