@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orcaflow"
+version = "1.0.0"
+description = "CRM local para autônomos: clientes, orçamentos, propostas e próximos contatos"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+authors = [{name = "Leonardo Santos"}]
+license = "MIT"
+
+[project.urls]
+Repository = "https://github.com/LeoDevsn/orcaflow"
+Issues = "https://github.com/LeoDevsn/orcaflow/issues"
+
+[project.scripts]
+orcaflow = "orca_flow.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["orca_flow*"]
