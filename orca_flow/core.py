@@ -231,12 +231,15 @@ class Store:
 
     def quote(self, quote_id: int) -> dict:
         with self.connect() as db:
-            row = db.execute("SELECT * FROM quotes WHERE id=?", (quote_id,)).fetchone()
-            if not row:
-                raise ValueError("Orçamento não encontrado.")
-            result = dict(row)
-            result["items"] = [dict(r) for r in db.execute("SELECT * FROM lines WHERE quote_id=? ORDER BY id", (quote_id,))]
-            result["events"] = [dict(r) for r in db.execute("SELECT * FROM events WHERE quote_id=? ORDER BY id DESC", (quote_id,))]
+            return self._quote_from_db(db, quote_id)
+
+    def _quote_from_db(self, db, quote_id: int) -> dict:
+        row = db.execute("SELECT * FROM quotes WHERE id=?", (quote_id,)).fetchone()
+        if not row:
+            raise ValueError("Orçamento não encontrado.")
+        result = dict(row)
+        result["items"] = [dict(r) for r in db.execute("SELECT * FROM lines WHERE quote_id=? ORDER BY id", (quote_id,))]
+        result["events"] = [dict(r) for r in db.execute("SELECT * FROM events WHERE quote_id=? ORDER BY id DESC", (quote_id,))]
         result["customer"] = json.loads(result["customer_snapshot"])
         result["number"] = f"ORC-{result['created'][:4]}-{quote_id:05d}"
         result["subtotal"] = sum(line_total(i["qty_milli"], i["unit_cents"]) for i in result["items"])
@@ -257,27 +260,31 @@ class Store:
         return result
 
     def set_stage(self, quote_id: int, stage: str) -> None:
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._set_stage(db, quote_id, stage)
+
+    def _set_stage(self, db, quote_id: int, stage: str) -> None:
         if stage not in STAGES:
             raise ValueError("Etapa inválida.")
-        with self.connect() as db:
-            old = db.execute("SELECT stage,title FROM quotes WHERE id=?", (quote_id,)).fetchone()
-            if not old:
-                raise ValueError("Orçamento não encontrado.")
-            if old["stage"] == stage:
-                return
-            if stage == "Rascunho" and old["stage"] != "Rascunho":
-                raise ValueError("Use Duplicar para criar uma nova versão editável.")
-            db.execute("UPDATE quotes SET stage=?,updated=? WHERE id=?", (stage, now(), quote_id))
-            db.execute("INSERT INTO events(quote_id,description,created) VALUES(?,?,?)", (quote_id, f"{old['stage']} → {stage}", now()))
-            if stage in TERMINAL:
-                db.execute("UPDATE tasks SET state='cancelled' WHERE quote_id=? AND state='open' AND automatic=1", (quote_id,))
-            elif stage in {"Enviado", "Negociação"}:
-                due = (date.today() + timedelta(days=3 if stage == "Enviado" else 2)).isoformat()
-                exists = db.execute("SELECT id FROM tasks WHERE quote_id=? AND automatic=1 AND state='open'", (quote_id,)).fetchone()
-                if exists:
-                    db.execute("UPDATE tasks SET due=? WHERE id=?", (due, exists["id"]))
-                else:
-                    db.execute("INSERT INTO tasks(quote_id,title,due,automatic,created) VALUES(?,?,?,1,?)", (quote_id, f"Retornar contato: {old['title']}", due, now()))
+        old = db.execute("SELECT stage,title FROM quotes WHERE id=?", (quote_id,)).fetchone()
+        if not old:
+            raise ValueError("Orçamento não encontrado.")
+        if old["stage"] == stage:
+            return
+        if stage == "Rascunho" and old["stage"] != "Rascunho":
+            raise ValueError("Use Duplicar para criar uma nova versão editável.")
+        db.execute("UPDATE quotes SET stage=?,updated=? WHERE id=?", (stage, now(), quote_id))
+        db.execute("INSERT INTO events(quote_id,description,created) VALUES(?,?,?)", (quote_id, f"{old['stage']} → {stage}", now()))
+        if stage in TERMINAL:
+            db.execute("UPDATE tasks SET state='cancelled' WHERE quote_id=? AND state='open' AND automatic=1", (quote_id,))
+        elif stage in {"Enviado", "Negociação"}:
+            due = (date.today() + timedelta(days=3 if stage == "Enviado" else 2)).isoformat()
+            exists = db.execute("SELECT id FROM tasks WHERE quote_id=? AND automatic=1 AND state='open'", (quote_id,)).fetchone()
+            if exists:
+                db.execute("UPDATE tasks SET due=? WHERE id=?", (due, exists["id"]))
+            else:
+                db.execute("INSERT INTO tasks(quote_id,title,due,automatic,created) VALUES(?,?,?,1,?)", (quote_id, f"Retornar contato: {old['title']}", due, now()))
 
     def duplicate_quote(self, quote_id: int) -> int:
         quote = self.quote(quote_id)
@@ -308,9 +315,20 @@ class Store:
         with self.connect() as db:
             return dict(db.execute("SELECT key,value FROM settings"))
 
-    def save_settings(self, company="", email="", phone="", footer=""):
+    def save_settings(self, company="", email="", phone="", footer="", entity_type=None, legal_name=None, document=None, document_visibility=None):
         values = {"company": text(company, "empresa", limit=150), "email": text(email, "e-mail", limit=254),
                   "phone": text(phone, "telefone", limit=60), "footer": text(footer, "rodapé", limit=2000)}
+        if any(value is not None for value in (entity_type, legal_name, document, document_visibility)):
+            from .documents import document as validate_document
+            old = self.settings()
+            entity = entity_type if entity_type is not None else old.get("entity_type", "PF")
+            if entity not in {"PF", "PJ"}:
+                raise ValueError("Escolha pessoa física ou empresa.")
+            visibility = document_visibility if document_visibility is not None else old.get("document_visibility", "masked")
+            if visibility not in {"masked", "full"}:
+                raise ValueError("Escolha como exibir o documento na proposta.")
+            values.update(entity_type=entity, legal_name=text(legal_name if legal_name is not None else old.get("legal_name", ""), "nome ou razão social", limit=200),
+                          document=validate_document(document if document is not None else old.get("document", ""), entity), document_visibility=visibility)
         with self.connect() as db:
             db.executemany("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", values.items())
 
@@ -362,6 +380,8 @@ class Store:
     def export_proposal(self, quote_id: int, target: Path | str) -> None:
         q = self.quote(quote_id)
         settings = self.settings()
+        from .documents import business_identity
+        business = business_identity(settings)
         escape = lambda value: html.escape(str(value), quote=True)
         rows = "".join(f"<tr><td>{escape(i['description'])}</td><td class='num'>{decimal_quantity(i['qty_milli'])}</td>"
                        f"<td class='num'>{money(i['unit_cents'])}</td><td class='num'>{money(line_total(i['qty_milli'],i['unit_cents']))}</td></tr>" for i in q["items"])
@@ -381,7 +401,7 @@ thead{{display:table-header-group}}tr{{break-inside:avoid}}.num{{text-align:righ
 .notes{{white-space:pre-wrap;overflow-wrap:anywhere}}footer{{border-top:1px solid #ddd;margin-top:40px;padding-top:18px;font-size:12px;color:#6b7280}}
 @page{{size:A4;margin:15mm}}@media print{{body{{background:white;padding:0}}main{{padding:15px;max-width:none}}header{{break-inside:avoid}}}}
 </style></head><body><main><header><div><strong>{escape(settings.get('company') or 'Proposta comercial')}</strong>
-<p class="muted">{escape(settings.get('email',''))}<br>{escape(settings.get('phone',''))}</p></div>
+<p class="muted">{escape(business.get('legal_name',''))}<br>{escape(business.get('document_label',''))} {escape(business.get('document',''))}<br>{escape(settings.get('email',''))}<br>{escape(settings.get('phone',''))}</p></div>
 <div><span class="badge">{escape(q['number'])}</span><p class="muted">Validade: {escape(q['expires'])}</p></div></header>
 <h1>{escape(q['title'])}</h1><p class="muted">Proposta preparada para {escape(q['customer']['name'])}</p>
 <h2>CLIENTE</h2><p><strong>{escape(q['customer']['name'])}</strong><br>{escape(q['customer']['company'])}
@@ -416,6 +436,10 @@ thead{{display:table-header-group}}tr{{break-inside:avoid}}.num{{text-align:righ
                 raise ValueError("Backup contém referências inválidas.")
             safety = self.directory / f"antes-restauracao-{uuid.uuid4().hex[:10]}.sqlite3"
             self.backup(safety)
+            # A cópia comercial não deve reativar links que já foram encerrados.
+            if (self.directory / ".portal-generation").exists():
+                from .portal import rotate_generation
+                rotate_generation(self.directory)
             with self.connect() as destination:
                 source.backup(destination)
             return safety

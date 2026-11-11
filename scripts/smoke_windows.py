@@ -4,6 +4,7 @@ import json
 import os
 import secrets
 import socket
+import sys
 import subprocess
 import tempfile
 import time
@@ -14,6 +15,7 @@ from pathlib import Path
 
 def main():
     root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root))
     executable = root / "dist" / "OrcaFlow.exe"
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
@@ -33,8 +35,9 @@ def main():
                     time.sleep(0.2)
             else:
                 raise RuntimeError("O executável não iniciou o servidor no tempo esperado.")
-            assert health["app"] == "orcaflow" and health["version"] == "2.0.0"
-            for path in ("/", "/static/app.js", "/static/style.css", "/static/fonts/public-sans-400.ttf"):
+            from orca_flow import __version__
+            assert health["app"] == "orcaflow" and health["version"] == __version__
+            for path in ("/", "/static/app.js", "/static/style.css", "/static/portal.js", "/static/portal.css", "/static/fonts/public-sans-400.ttf"):
                 with urllib.request.urlopen(base + path, timeout=3) as response:
                     assert response.status == 200
                     assert response.read()

@@ -1,5 +1,15 @@
 # Alterações
 
+## 2.1.0
+
+- Portal reservado por link para aprovar, recusar e pedir ajustes em uma versão fixa.
+- Conversa com o cliente, pedidos convertidos em tarefas e aviso de mensagens novas.
+- Pix/cartão via checkout Mercado Pago, com configuração inicial vazia, credenciais cifradas e confirmação canônica por API/Webhook.
+- Cadastro de prestador PF/PJ com CPF/CNPJ numérico ou alfanumérico, identificação e contato nas propostas.
+- Solicitação de dados fiscais e entrega de PDF/XML emitidos externamente, incluídos no backup.
+- Link revogável, expiração de acesso e invalidação de links após restaurar backups.
+- Homologação de pagamentos e revisão visual real permanecem dependentes da configuração e do ambiente descritos em QA.md.
+
 ## 2.0.0
 
 - Nova interface web, com navegação superior, linguagem de tarefas e estados vazios orientados.

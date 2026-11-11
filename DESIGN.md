@@ -30,3 +30,7 @@ Visible focus rings, explicit labels, keyboard-operable dialogs, loading and err
 ## Responsive
 
 At 900 px supporting columns stack. At 640 px navigation gains a second row, tables become labeled record rows, the quote summary follows the editor, and actions remain reachable. Respect reduced motion. Test desktop, narrow desktop and mobile with real and empty data.
+
+## Client portal
+
+The client receives a document-led page with the provider identity and fixed proposal, a clear response form, payment status separated from approval, conversation, and fiscal documents. It inherits the same type, palette and controls and has no management navigation. Names entered through a link are described as informed names, not verified identities. Payment test mode remains explicit after every result. Fiscal upload is labeled as delivery of an already-issued document.

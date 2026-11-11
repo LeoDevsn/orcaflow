@@ -22,7 +22,7 @@ Aplicativo Windows existente com dados em SQLite. A nova interface abre no naveg
 
 Preservar cadastro/importação de clientes, propostas com itens e descontos, snapshots de cliente, etapas, lembretes, exportação e backup/restauração. Valores calculados pelo servidor em centavos. Não há envio de mensagens, cobrança, emissão fiscal ou sincronização em nuvem. Dados de demonstração devem ficar separados dos dados reais.
 
-Interpretação de trabalho do pedido cliente-servidor: navegador conectado ao backend próprio. A pergunta sobre um portal externo de aprovação foi apresentada e permanece aberta; esse portal não é parte da implementação atual.
+O usuário confirmou o portal externo: destinatários consultam uma proposta por link, aprovam, recusam, pedem ajustes, trocam mensagens e informam dados para nota fiscal. O proprietário configura recebimentos Pix/cartão; nenhum provedor vem preenchido. NFS-e automática depende de integração fiscal específica; a versão atual solicita dados e entrega documentos já emitidos, sem fabricar notas fiscais.
 
 ## Brand Commitments
 

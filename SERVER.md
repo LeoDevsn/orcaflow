@@ -45,6 +45,20 @@ orcaflow.seudominio.com {
 
 A instalação do proxy, configuração DNS e gerenciamento de TLS são responsabilidade do administrador. `ORCAFLOW_PROXY=1` aceita o protocolo encaminhado somente do proxy em `127.0.0.1`. Não exponha a porta do backend à internet. Requisições remotas à API por HTTP sem TLS são recusadas. Cookies usam Secure quando `ORCAFLOW_HTTPS=1`.
 
+## Portal e recebimentos
+
+O proprietário cadastra o endereço público em **Meu negócio → Links para clientes**, depois que DNS/TLS e proxy já estiverem funcionando. Alternativamente, o administrador pode definir `ORCAFLOW_PUBLIC_URL=https://orcaflow.seudominio.com`. Sem endereço público, links são locais e não funcionam no dispositivo de um cliente externo.
+
+Em **Receber por Pix ou cartão**, cadastre as credenciais da aplicação Mercado Pago. Elas vêm vazias. Configure Webhooks de **Pagamentos** em `https://seu-dominio/api/payments/webhook` e copie a assinatura secreta. Use conta/credenciais de teste e homologue primeiro. O formulário verifica a conta pela API antes de guardar a configuração; marcar produção não substitui a homologação do provedor.
+
+As credenciais são cifradas com Fernet em `.payments.enc`, com chave `.payments-key`, ambas na pasta de dados. Proteja essa pasta e os backups administrativos. O backup comercial não inclui essas credenciais. O arquivo `.portal-generation` invalida links ao restaurar uma base; depois da restauração, gere links novos para os clientes. Não copie arquivos secretos para repositórios públicos ou imagens Docker.
+
+As notificações têm assinatura HMAC verificada antes da consulta à API. A confirmação canônica confere referência, recebedor, BRL, valor e modo de teste/produção. Nenhum endpoint de retorno aceita um status de pagamento vindo do navegador como prova. Não há cancelamento de pagamento, reembolso automático ou divisão de pagamentos nesta versão; trate essas operações na conta do provedor. Desabilitar recebimentos ou encerrar um link não desfaz um checkout já iniciado.
+
+A integração com Mercado Pago foi testada com respostas simuladas. Recebimentos reais dependem da conta, domínio HTTPS, credenciais e homologação pelo proprietário. Recursos e instruções oficiais: [Checkout Pro](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro-preferences/overview), [Webhooks](https://www.mercadopago.com.br/developers/pt/docs/checkout-pro-preferences/payment-notifications).
+
+Documentos fiscais anexados são armazenados no banco comercial e entram no backup. A emissão continua externa; cadastrar CPF/CNPJ não cria autorização para emitir NFS-e.
+
 ## Docker Compose
 
 O `compose.yaml` é um modelo para uso atrás do proxy HTTPS no mesmo host. Antes de subir, troque `orcaflow.example.com` pelo seu domínio. Crie a conta no volume e depois inicie:
